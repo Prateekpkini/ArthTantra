@@ -17,14 +17,14 @@ export function useVoice() {
     isSupported: typeof window !== "undefined" && "webkitSpeechRecognition" in window || typeof window !== "undefined" && "SpeechRecognition" in window,
   });
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setState((s) => ({ ...s, isSupported: false }));
@@ -36,7 +36,7 @@ export function useVoice() {
     recognition.interimResults = true;
     recognition.lang = "en-IN";
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       let transcript = "";
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
@@ -44,7 +44,7 @@ export function useVoice() {
       setState((s) => ({ ...s, transcript }));
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: any) => {
       setState((s) => ({
         ...s,
         error: `Speech recognition error: ${event.error}`,
