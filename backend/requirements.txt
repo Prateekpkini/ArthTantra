@@ -1,0 +1,30 @@
+# FastAPI & Server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sse-starlette==2.2.1
+python-multipart==0.0.20
+httpx==0.28.1
+
+# LangGraph & LangChain
+langgraph==0.2.60
+langchain==0.3.14
+langchain-google-genai==2.0.8
+langchain-openai==0.2.14
+langchain-core==0.3.29
+
+# Database
+supabase==2.11.0
+
+# Environment
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Automation
+playwright==1.49.1
+
+# Voice (optional)
+retell-sdk==4.15.0
+
+# Utilities
+uuid6==2024.7.10
