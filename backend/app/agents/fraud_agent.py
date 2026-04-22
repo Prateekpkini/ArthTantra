@@ -34,40 +34,41 @@ def create_fraud_agent_node(llm):
     """Create the fraud detection agent node."""
 
     async def fraud_agent(state: AgentState) -> dict:
-        reasoning_log = list(state.get("reasoning_log", []))
+        try:
+            reasoning_log = list(state.get("reasoning_log", []))
+            financial_ctx = state.get("financial_context", {})
 
-        reasoning_log.append(ReasoningStep(
-            agent="fraud_agent",
-            step="scanning",
-            content="Scanning shadow ledger for anomalous patterns...",
-            timestamp=datetime.now().isoformat(),
-        ))
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="scanning",
+                content="Scanning shadow ledger for anomalous patterns...",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        # Get transactions from context or generate mock
-        financial_ctx = state.get("financial_context", {})
-        transactions = financial_ctx.get("recent_transactions", generate_mock_transactions(30))
+            # Get transactions from context or generate mock
+            transactions = financial_ctx.get("recent_transactions", generate_mock_transactions(30))
 
-        # Pre-analyze anomalies
-        anomalies = [t for t in transactions if t.get("anomaly_score", 0) > 0.5]
-        impulse_buys = [t for t in transactions if t.get("emotional_tag") == "impulse"]
-        late_night = [t for t in transactions if t.get("hour_of_day", 12) >= 23 or t.get("hour_of_day", 12) <= 4]
+            # Pre-analyze anomalies
+            anomalies = [t for t in transactions if t.get("anomaly_score", 0) > 0.5]
+            impulse_buys = [t for t in transactions if t.get("emotional_tag") == "impulse"]
+            late_night = [t for t in transactions if t.get("hour_of_day", 12) >= 23 or t.get("hour_of_day", 12) <= 4]
 
-        reasoning_log.append(ReasoningStep(
-            agent="fraud_agent",
-            step="cross_referencing",
-            content=f"Cross-referencing {len(transactions)} transactions... Found {len(anomalies)} anomalies, {len(impulse_buys)} impulse purchases, {len(late_night)} late-night transactions.",
-            timestamp=datetime.now().isoformat(),
-        ))
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="cross_referencing",
+                content=f"Cross-referencing {len(transactions)} transactions... Found {len(anomalies)} anomalies, {len(impulse_buys)} impulse purchases, {len(late_night)} late-night transactions.",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        # Build context for LLM
-        anomaly_summary = ""
-        for a in anomalies[:5]:
-            anomaly_summary += f"\n- {a['merchant']}: ₹{a['amount']} at {a.get('hour_of_day', 'N/A')}:00, anomaly score: {a['anomaly_score']}, tag: {a.get('emotional_tag', 'N/A')}"
+            # Build context for LLM
+            anomaly_summary = ""
+            for a in anomalies[:5]:
+                anomaly_summary += f"\n- {a['merchant']}: ₹{a['amount']} at {a.get('hour_of_day', 'N/A')}:00, anomaly score: {a['anomaly_score']}, tag: {a.get('emotional_tag', 'N/A')}"
 
-        impulse_summary = f"\nImpulse purchases: {len(impulse_buys)} transactions totaling ₹{sum(t['amount'] for t in impulse_buys):,.0f}"
-        late_night_summary = f"\nLate-night transactions: {len(late_night)} transactions totaling ₹{sum(t['amount'] for t in late_night):,.0f}"
+            impulse_summary = f"\nImpulse purchases: {len(impulse_buys)} transactions totaling ₹{sum(t['amount'] for t in impulse_buys):,.0f}"
+            late_night_summary = f"\nLate-night transactions: {len(late_night)} transactions totaling ₹{sum(t['amount'] for t in late_night):,.0f}"
 
-        context_msg = f"""Shadow Ledger Analysis:
+            context_msg = f"""Shadow Ledger Analysis:
 Total transactions analyzed: {len(transactions)}
 Flagged anomalies: {len(anomalies)}{anomaly_summary}
 {impulse_summary}
@@ -75,50 +76,76 @@ Flagged anomalies: {len(anomalies)}{anomaly_summary}
 
 User's query: {state['messages'][-1].content if state['messages'] else 'General fraud check'}"""
 
-        messages = [
-            SystemMessage(content=FRAUD_SYSTEM_PROMPT),
-            *state["messages"][-3:],
-            SystemMessage(content=context_msg),
-        ]
+            messages = [
+                SystemMessage(content=FRAUD_SYSTEM_PROMPT),
+                *state["messages"][-3:],
+                SystemMessage(content=context_msg),
+            ]
 
-        reasoning_log.append(ReasoningStep(
-            agent="fraud_agent",
-            step="analyzing",
-            content="Running deep pattern analysis with cyclical verification...",
-            timestamp=datetime.now().isoformat(),
-        ))
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="analyzing",
+                content="Running deep pattern analysis with cyclical verification...",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        response = await llm.ainvoke(messages)
+            # Call LLM with fallback
+            try:
+                response = await llm.ainvoke(messages)
+                content = response.content
+            except Exception as e:
+                print(f"CRITICAL ERROR in Fraud Agent LLM call: {e}")
+                content = "I encountered an issue while analyzing your transactions. Please try again."
 
-        # Cyclical verification — double-check the findings
-        reasoning_log.append(ReasoningStep(
-            agent="fraud_agent",
-            step="verifying",
-            content="Verifying findings... cross-checking anomaly scores with behavioral baselines...",
-            timestamp=datetime.now().isoformat(),
-        ))
+            # Cyclical verification — double-check the findings
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="verifying",
+                content="Verifying findings... cross-checking anomaly scores with behavioral baselines...",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        reasoning_log.append(ReasoningStep(
-            agent="fraud_agent",
-            step="complete",
-            content="Fraud analysis complete. Findings verified.",
-            timestamp=datetime.now().isoformat(),
-        ))
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="complete",
+                content="Fraud analysis complete. Findings verified.",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        # Update financial context with anomalies
-        updated_context = dict(financial_ctx)
-        updated_context["anomalies"] = [
-            {"merchant": a["merchant"], "amount": a["amount"], "score": a["anomaly_score"], "tag": a.get("emotional_tag")}
-            for a in anomalies
-        ]
+            # Update financial context with anomalies
+            updated_context = dict(financial_ctx)
+            updated_context["anomalies"] = [
+                {"merchant": a["merchant"], "amount": a["amount"], "score": a["anomaly_score"], "tag": a.get("emotional_tag")}
+                for a in anomalies
+            ]
 
-        return {
-            "messages": [AIMessage(content=response.content)],
-            "current_agent": "fraud_agent",
-            "reasoning_log": reasoning_log,
-            "financial_context": updated_context,
-            "verification_needed": False,
-            "final_response": response.content,
-        }
+            return {
+                "messages": [AIMessage(content=content)],
+                "current_agent": "fraud_agent",
+                "reasoning_log": reasoning_log,
+                "financial_context": updated_context,
+                "verification_needed": False,
+                "final_response": content,
+            }
+
+        except Exception as e:
+            # FINAL FALLBACK - catch-all for any unexpected errors
+            print(f"UNEXPECTED ERROR in fraud_agent: {e}")
+            reasoning_log = list(state.get("reasoning_log", []))
+            financial_ctx = state.get("financial_context", {})
+            reasoning_log.append(ReasoningStep(
+                agent="fraud_agent",
+                step="error",
+                content=f"Error occurred: {str(e)}",
+                timestamp=datetime.now().isoformat(),
+            ))
+            return {
+                "messages": [AIMessage(content="An unexpected error occurred while analyzing your transactions.")],
+                "current_agent": "fraud_agent",
+                "reasoning_log": reasoning_log,
+                "financial_context": financial_ctx,
+                "verification_needed": False,
+                "final_response": "Error",
+            }
 
     return fraud_agent
