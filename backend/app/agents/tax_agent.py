@@ -39,62 +39,63 @@ def create_tax_agent_node(llm):
     """Create the tax optimization agent node."""
 
     async def tax_agent(state: AgentState) -> dict:
-        reasoning_log = list(state.get("reasoning_log", []))
-        financial_ctx = state.get("financial_context", {})
+        try:
+            reasoning_log = list(state.get("reasoning_log", []))
+            financial_ctx = state.get("financial_context", {})
+            
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="gathering",
+                content="Gathering income data and deduction records...",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="gathering",
-            content="Gathering income data and deduction records...",
-            timestamp=datetime.now().isoformat(),
-        ))
+            # Get income data
+            annual_income = financial_ctx.get("monthly_income", 85000) * 12
 
-        # Get income data
-        annual_income = financial_ctx.get("monthly_income", 85000) * 12
+            # Calculate under both regimes
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="calculating_new",
+                content=f"Calculating tax under NEW regime for annual income ₹{annual_income:,.0f}...",
+                timestamp=datetime.now().isoformat(),
+            ))
+            new_regime = estimate_tax_liability(annual_income, regime="new")
 
-        # Calculate under both regimes
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="calculating_new",
-            content=f"Calculating tax under NEW regime for annual income ₹{annual_income:,.0f}...",
-            timestamp=datetime.now().isoformat(),
-        ))
-        new_regime = estimate_tax_liability(annual_income, regime="new")
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="calculating_old",
+                content=f"Calculating tax under OLD regime with available deductions...",
+                timestamp=datetime.now().isoformat(),
+            ))
+            deductions = {
+                "80C": 150000,  # PPF, ELSS, EPF
+                "80D": 25000,   # Health insurance
+                "HRA": 120000,  # House rent allowance
+            }
+            old_regime = estimate_tax_liability(annual_income, deductions=deductions, regime="old")
 
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="calculating_old",
-            content=f"Calculating tax under OLD regime with available deductions...",
-            timestamp=datetime.now().isoformat(),
-        ))
-        deductions = {
-            "80C": 150000,  # PPF, ELSS, EPF
-            "80D": 25000,   # Health insurance
-            "HRA": 120000,  # House rent allowance
-        }
-        old_regime = estimate_tax_liability(annual_income, deductions=deductions, regime="old")
+            # Determine better regime
+            better = "new" if new_regime["total_tax"] <= old_regime["total_tax"] else "old"
+            savings = abs(new_regime["total_tax"] - old_regime["total_tax"])
 
-        # Determine better regime
-        better = "new" if new_regime["total_tax"] <= old_regime["total_tax"] else "old"
-        savings = abs(new_regime["total_tax"] - old_regime["total_tax"])
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="comparing",
+                content=f"New regime: ₹{new_regime['total_tax']:,.0f} | Old regime: ₹{old_regime['total_tax']:,.0f} | {better.upper()} regime saves ₹{savings:,.0f}",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="comparing",
-            content=f"New regime: ₹{new_regime['total_tax']:,.0f} | Old regime: ₹{old_regime['total_tax']:,.0f} | {better.upper()} regime saves ₹{savings:,.0f}",
-            timestamp=datetime.now().isoformat(),
-        ))
+            # Cyclical verification
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="verifying",
+                content="Double-checking calculations against IT Act schedules...",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        # Cyclical verification
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="verifying",
-            content="Double-checking calculations against IT Act schedules...",
-            timestamp=datetime.now().isoformat(),
-        ))
-
-        # Build context for LLM response
-        context = f"""Tax Calculation Results:
+            # Build context for LLM response
+            context = f"""Tax Calculation Results:
 
 NEW REGIME:
 - Taxable Income: ₹{new_regime['taxable_income']:,.0f}
@@ -112,37 +113,63 @@ RECOMMENDATION: {better.upper()} regime saves ₹{savings:,.0f}/year
 
 User's query: {state['messages'][-1].content if state['messages'] else 'General tax analysis'}"""
 
-        messages = [
-            SystemMessage(content=TAX_SYSTEM_PROMPT),
-            *state["messages"][-3:],
-            SystemMessage(content=context),
-        ]
+            messages = [
+                SystemMessage(content=TAX_SYSTEM_PROMPT),
+                *state["messages"][-3:],
+                SystemMessage(content=context),
+            ]
 
-        response = await llm.ainvoke(messages)
+            # Call LLM with fallback
+            try:
+                response = await llm.ainvoke(messages)
+                content = response.content
+            except Exception as e:
+                print(f"CRITICAL ERROR in Tax Agent LLM call: {e}")
+                content = "I encountered an issue while analyzing your tax data."
 
-        reasoning_log.append(ReasoningStep(
-            agent="tax_agent",
-            step="complete",
-            content="Tax analysis complete. Calculations verified ✓",
-            timestamp=datetime.now().isoformat(),
-        ))
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="complete",
+                content="Tax analysis complete. Calculations verified ✓",
+                timestamp=datetime.now().isoformat(),
+            ))
 
-        # Update context with tax data
-        updated_context = dict(financial_ctx)
-        updated_context["tax_data"] = {
-            "new_regime": new_regime,
-            "old_regime": old_regime,
-            "recommended": better,
-            "potential_savings": savings,
-        }
+            # Update context with tax data
+            updated_context = dict(financial_ctx)
+            updated_context["tax_data"] = {
+                "new_regime": new_regime,
+                "old_regime": old_regime,
+                "recommended": better,
+                "potential_savings": savings,
+            }
 
-        return {
-            "messages": [AIMessage(content=response.content)],
-            "current_agent": "tax_agent",
-            "reasoning_log": reasoning_log,
-            "financial_context": updated_context,
-            "verification_needed": False,
-            "final_response": response.content,
-        }
+            return {
+                "messages": [AIMessage(content=content)],
+                "current_agent": "tax_agent",
+                "reasoning_log": reasoning_log,
+                "financial_context": updated_context,
+                "verification_needed": False,
+                "final_response": content,
+            }
+
+        except Exception as e:
+            # 4. FINAL FALLBACK - catch-all for any unexpected errors
+            print(f"UNEXPECTED ERROR in tax_agent: {e}")
+            reasoning_log = list(state.get("reasoning_log", []))
+            financial_ctx = state.get("financial_context", {})
+            reasoning_log.append(ReasoningStep(
+                agent="tax_agent",
+                step="error",
+                content=f"Error occurred: {str(e)}",
+                timestamp=datetime.now().isoformat(),
+            ))
+            return {
+                "messages": [AIMessage(content="An unexpected error occurred while processing your tax request.")],
+                "current_agent": "tax_agent",
+                "reasoning_log": reasoning_log,
+                "financial_context": financial_ctx,
+                "verification_needed": False,
+                "final_response": "Error",
+            }
 
     return tax_agent
