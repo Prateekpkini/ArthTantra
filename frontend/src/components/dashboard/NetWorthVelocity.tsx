@@ -27,7 +27,7 @@ const defaultData: VelocityData = {
 export default function NetWorthVelocity({ data }: { data?: VelocityData }) {
   const v = data || defaultData;
   const months = ["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
-  const growth = ((v.annual_projected - v.current_net_worth) / v.current_net_worth) * 100;
+  const growth = v.current_net_worth > 0 ? ((v.annual_projected - v.current_net_worth) / v.current_net_worth) * 100 : 0;
 
   const paths = useMemo(() => {
     const W = 500, H = 140, pt = 10, pb = 20;

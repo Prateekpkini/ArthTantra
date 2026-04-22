@@ -169,18 +169,24 @@ export async function* streamChat(
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const event: SSEEvent = JSON.parse(line.slice(6));
-          yield event;
-        } catch {
-          // Skip malformed events
+    
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const eventStr = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      
+      const lines = eventStr.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const event: SSEEvent = JSON.parse(line.slice(6));
+            yield event;
+          } catch {
+            // Skip malformed events
+          }
         }
       }
+      boundary = buffer.indexOf("\n\n");
     }
   }
 }

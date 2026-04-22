@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     @property
     def is_mock(self) -> bool:
         return self.mock_mode or self.plaid_client_id == "mock"
+        
+    def model_post_init(self, __context) -> None:
+        if not self.is_mock:
+            if self.llm_provider == "gemini" and not self.google_api_key:
+                raise ValueError("Google API key is missing. Set GOOGLE_API_KEY or use mock mode.")
+            if self.llm_provider == "openai" and not self.openai_api_key:
+                raise ValueError("OpenAI API key is missing. Set OPENAI_API_KEY or use mock mode.")
 
     class Config:
         env_file = ".env"

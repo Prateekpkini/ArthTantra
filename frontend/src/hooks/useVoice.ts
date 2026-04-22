@@ -14,7 +14,7 @@ export function useVoice() {
     isListening: false,
     transcript: "",
     error: null,
-    isSupported: typeof window !== "undefined" && "webkitSpeechRecognition" in window || typeof window !== "undefined" && "SpeechRecognition" in window,
+    isSupported: typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window),
   });
 
   const recognitionRef = useRef<any | null>(null);
