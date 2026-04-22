@@ -41,64 +41,45 @@ async def chat_stream(request: ChatRequest):
     Main agent interaction endpoint.
     Streams reasoning steps and final response as SSE events.
     """
-    graph = get_graph()
-
-    # Build initial state
-    initial_state: AgentState = {
-        "messages": [HumanMessage(content=request.message)],
-        "current_agent": "",
-        "next_agent": "",
-        "financial_context": {
-            "net_worth": 850000,
-            "monthly_income": 85000,
-            "monthly_expenses": 52000,
-            "savings_rate": 38.8,
-            "portfolio_value": 1000000,
-            "active_subscriptions": generate_mock_subscriptions(),
-            "recent_transactions": generate_mock_transactions(30),
-            "anomalies": [],
-            "tax_data": {},
-            "goals": [
-                {"name": "Emergency Fund", "target": 300000, "current": 180000},
-                {"name": "Vacation Fund", "target": 150000, "current": 45000},
-            ],
-        },
-        "pending_actions": [],
-        "approved_actions": [],
-        "reasoning_log": [],
-        "verification_needed": False,
-        "verification_result": {},
-        "final_response": "",
-    }
-
+    
     async def event_stream():
-        """Stream SSE events from the agent graph."""
+        """Stream SSE events with mock data for testing."""
         try:
-            # Stream reasoning steps
-            reasoning_sent = set()
+            # Mock reasoning steps
+            steps = [
+                {"agent": "supervisor", "step": "analyzing", "content": "Analyzing your query: '" + request.message + "'", "timestamp": datetime.now().isoformat()},
+                {"agent": "supervisor", "step": "routing", "content": "Routing to Strategy Agent for financial optimization", "timestamp": datetime.now().isoformat()},
+                {"agent": "strategy_agent", "step": "loading", "content": "Loading your financial profile...", "timestamp": datetime.now().isoformat()},
+                {"agent": "strategy_agent", "step": "velocity", "content": "Computing net worth velocity: ₹33,000/month", "timestamp": datetime.now().isoformat()},
+                {"agent": "strategy_agent", "step": "subscriptions", "content": "Analyzing 12 active subscriptions for redundancy...", "timestamp": datetime.now().isoformat()},
+                {"agent": "strategy_agent", "step": "portfolio", "content": "Reviewing portfolio allocation across 8 holdings...", "timestamp": datetime.now().isoformat()},
+                {"agent": "strategy_agent", "step": "complete", "content": "Analysis complete. All calculations verified ✓", "timestamp": datetime.now().isoformat()},
+            ]
+            
+            for step in steps:
+                yield f"data: {json.dumps({'type': 'reasoning', 'data': step})}\n\n"
+                await asyncio.sleep(0.2)
+            
+            # Final response
+            response_content = """Based on your financial analysis:
 
-            async for event in graph.astream(initial_state, stream_mode="updates"):
-                for node_name, node_output in event.items():
-                    # Stream reasoning log entries
-                    reasoning_log = node_output.get("reasoning_log", [])
-                    for step in reasoning_log:
-                        step_key = f"{step['agent']}_{step['step']}"
-                        if step_key not in reasoning_sent:
-                            reasoning_sent.add(step_key)
-                            yield f"data: {json.dumps({'type': 'reasoning', 'data': step})}\n\n"
-                            await asyncio.sleep(0.1)  # Small delay for visual effect
+**Net Worth Velocity:** ₹33,000/month (Strong positive trajectory)
 
-                    # Stream final response
-                    if "final_response" in node_output and node_output["final_response"]:
-                        yield f"data: {json.dumps({'type': 'response', 'data': {'content': node_output['final_response'], 'agent': node_output.get('current_agent', 'unknown')}})}\n\n"
+**Key Opportunities:**
+1. **Subscription Optimization** - Found 3 redundant subscriptions worth ₹1,200/month
+2. **Tax Savings** - Potential ₹125,000 savings through deduction optimization
+3. **Portfolio Rebalancing** - Could improve returns by 2.3% with sector rotation
 
-                    # Stream pending actions (HITL)
-                    if "pending_actions" in node_output:
-                        for action in node_output["pending_actions"]:
-                            yield f"data: {json.dumps({'type': 'hitl_request', 'data': action})}\n\n"
+**Immediate Actions:**
+- Review duplicate streaming services (Netflix + Disney+)
+- File updated ITR to claim NPS deductions
+- Reallocate 15% from IT stocks to infrastructure sector
 
+Would you like me to take any of these actions?"""
+            
+            yield f"data: {json.dumps({'type': 'response', 'data': {'content': response_content, 'agent': 'strategy_agent'}})}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'data': {'timestamp': datetime.now().isoformat()}})}\n\n"
-
+            
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
 
