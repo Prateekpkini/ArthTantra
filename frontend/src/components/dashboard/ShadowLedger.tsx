@@ -63,32 +63,33 @@ export default function ShadowLedger({ transactions }: ShadowLedgerProps) {
   };
 
   return (
-    <div className="glass-panel p-4 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+    <div className="glass-panel p-5 h-full flex flex-col relative overflow-hidden" style={{ background: "rgba(11,17,33,0.3)" }}>
+      <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] pointer-events-none" style={{ background: "rgba(244, 63, 94, 0.05)" }}></div>
+      <div className="flex items-center justify-between mb-4 z-10">
+        <div className="flex items-center gap-3">
           <div
-            className="w-6 h-6 rounded-md flex items-center justify-center text-xs"
-            style={{ background: "rgba(244, 63, 94, 0.15)" }}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm glow-border"
+            style={{ background: "var(--bg-tertiary)" }}
           >
-            📋
+            <span style={{ color: "var(--accent-rose)" }}>📋</span>
           </div>
           <h3
-            className="text-sm font-semibold"
-            style={{ fontFamily: "var(--font-display)" }}
+            className="text-md font-bold tracking-tight"
+            style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
           >
             Shadow Ledger
           </h3>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5 p-1 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
           {(["all", "flagged", "reconciled"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className="text-[10px] px-2 py-1 rounded-md transition-all capitalize"
+              className="text-[10px] font-bold px-3 py-1.5 rounded-md transition-all capitalize tracking-wide"
               style={{
-                background: filter === f ? "rgba(139, 92, 246, 0.15)" : "transparent",
-                color: filter === f ? "var(--accent-purple)" : "var(--text-muted)",
-                border: `1px solid ${filter === f ? "rgba(139, 92, 246, 0.3)" : "transparent"}`,
+                background: filter === f ? "rgba(159, 122, 234, 0.2)" : "transparent",
+                color: filter === f ? "var(--text-primary)" : "var(--text-muted)",
+                boxShadow: filter === f ? "0 0 10px rgba(159, 122, 234, 0.2)" : "none",
               }}
             >
               {f}
@@ -97,66 +98,72 @@ export default function ShadowLedger({ transactions }: ShadowLedgerProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{ minHeight: 0 }}>
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2 z-10" style={{ minHeight: 0 }}>
         {filtered.map((txn, i) => (
           <div
             key={txn.id}
-            className="rounded-xl p-3 transition-all animate-fade-in-up"
+            className="rounded-2xl p-4 transition-all animate-fade-in-up hover:scale-[1.02] hover:z-10 relative cursor-pointer"
             style={{
               background: txn.anomaly_score > 0.5
-                ? "rgba(244, 63, 94, 0.05)"
+                ? "rgba(244, 63, 94, 0.08)"
                 : "rgba(255, 255, 255, 0.02)",
               border: `1px solid ${
                 txn.anomaly_score > 0.5
-                  ? "rgba(244, 63, 94, 0.2)"
+                  ? "rgba(244, 63, 94, 0.3)"
                   : "var(--glass-border)"
               }`,
-              animationDelay: `${i * 50}ms`,
+              boxShadow: txn.anomaly_score > 0.5 ? "0 4px 20px rgba(244, 63, 94, 0.15)" : "none",
+              animationDelay: `${i * 60}ms`,
             }}
           >
-            <div className="flex items-start justify-between mb-1.5">
+            <div className="flex items-start justify-between mb-2">
               <div>
-                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                <p className="text-sm font-bold" style={{ color: "var(--text-primary)", letterSpacing: "0.02em" }}>
                   {txn.merchant}
                 </p>
-                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                <p className="text-[10px] font-medium uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>
                   {txn.payment_method} · {formatTime(txn.timestamp)}
                   {txn.hour_of_day >= 23 || txn.hour_of_day <= 4 ? " 🌙" : ""}
                 </p>
               </div>
-              <p className="text-sm font-bold" style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+              <p className="text-base font-black" style={{ fontFamily: "var(--font-mono)", color: txn.anomaly_score > 0.5 ? "var(--accent-rose)" : "var(--text-primary)" }}>
                 ₹{txn.amount.toLocaleString()}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Emotional tag */}
               <span
-                className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded"
                 style={{
-                  background: `${tagColors[txn.emotional_tag] || "#64748B"}15`,
+                  background: `${tagColors[txn.emotional_tag] || "#64748B"}20`,
                   color: tagColors[txn.emotional_tag] || "#64748B",
+                  boxShadow: `0 0 10px ${tagColors[txn.emotional_tag] || "#64748B"}20`
                 }}
               >
                 {txn.emotional_tag}
               </span>
 
-              {/* Anomaly bar */}
-              <div className="flex-1">
-                <div className="anomaly-bar">
-                  <div
-                    className={`anomaly-bar-fill ${getAnomalyLevel(txn.anomaly_score)}`}
-                    style={{ width: `${txn.anomaly_score * 100}%` }}
-                  />
-                </div>
+              {/* Anomaly bar (Laser) */}
+              <div className="flex-1 relative h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <div
+                  className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ${getAnomalyLevel(txn.anomaly_score)}`}
+                  style={{ 
+                    width: `${txn.anomaly_score * 100}%`,
+                    background: txn.anomaly_score > 0.5 ? "var(--accent-rose)" : txn.anomaly_score > 0.2 ? "var(--accent-amber)" : "var(--accent-emerald)",
+                    boxShadow: `0 0 10px ${txn.anomaly_score > 0.5 ? "var(--accent-rose)" : txn.anomaly_score > 0.2 ? "var(--accent-amber)" : "var(--accent-emerald)"}`
+                  }}
+                />
               </div>
 
               {/* Status */}
-              {txn.reconciled ? (
-                <span className="text-[9px]" style={{ color: "var(--accent-emerald)" }}>✓</span>
-              ) : (
-                <span className="text-[9px]" style={{ color: "var(--accent-rose)" }}>⚠</span>
-              )}
+              <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: txn.reconciled ? "rgba(52, 211, 153, 0.15)" : "rgba(244, 63, 94, 0.15)" }}>
+                {txn.reconciled ? (
+                  <span className="text-[10px]" style={{ color: "var(--accent-emerald)" }}>✓</span>
+                ) : (
+                  <span className="text-[10px]" style={{ color: "var(--accent-rose)" }}>⚠</span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -164,12 +171,12 @@ export default function ShadowLedger({ transactions }: ShadowLedgerProps) {
 
       {/* Summary */}
       <div
-        className="mt-3 pt-3 flex justify-between text-[10px]"
+        className="mt-4 pt-4 flex justify-between text-[10px] font-bold uppercase tracking-widest z-10"
         style={{ borderTop: "1px solid var(--glass-border)", color: "var(--text-muted)" }}
       >
         <span>{filtered.length} transactions</span>
-        <span>{filtered.filter((t) => t.anomaly_score > 0.5).length} flagged</span>
-        <span>₹{filtered.reduce((s, t) => s + t.amount, 0).toLocaleString()} total</span>
+        <span style={{ color: filtered.filter((t) => t.anomaly_score > 0.5).length > 0 ? "var(--accent-rose)" : "inherit" }}>{filtered.filter((t) => t.anomaly_score > 0.5).length} flagged</span>
+        <span style={{ color: "var(--text-primary)" }}>₹{filtered.reduce((s, t) => s + t.amount, 0).toLocaleString()}</span>
       </div>
     </div>
   );
